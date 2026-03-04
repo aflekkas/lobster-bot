@@ -247,22 +247,48 @@ async def handle_help(update: Update, context) -> None:
 
 
 async def _heartbeat(project_dir: str, interval: int = 300) -> None:
-    """Periodically pull upstream changes. Runs every `interval` seconds (default 5 min)."""
+    """Periodically pull upstream changes. Runs every `interval` seconds (default 5 min).
+
+    Tries upstream remote first (fork workflow), falls back to origin.
+    If fast-forward fails (merge conflict), aborts and logs to memory/merge-conflicts.md.
+    """
     while True:
         await asyncio.sleep(interval)
         try:
+            # Determine which remote to pull from
+            remotes_result = await asyncio.to_thread(
+                subprocess.run,
+                ["git", "remote"],
+                cwd=project_dir,
+                capture_output=True, text=True, timeout=10,
+            )
+            remotes = remotes_result.stdout.strip().split("\n")
+            remote = "upstream" if "upstream" in remotes else "origin"
+
             result = await asyncio.to_thread(
                 subprocess.run,
-                ["git", "pull", "--ff-only"],
+                ["git", "pull", "--ff-only", remote, "main"],
                 cwd=project_dir,
-                capture_output=True,
-                text=True,
-                timeout=30,
+                capture_output=True, text=True, timeout=30,
             )
+
             if result.returncode == 0 and "Already up to date" not in result.stdout:
-                logger.info("Heartbeat: pulled updates — %s", result.stdout.strip())
+                logger.info("Heartbeat: pulled from %s — %s", remote, result.stdout.strip())
             elif result.returncode != 0:
-                logger.warning("Heartbeat: git pull failed — %s", result.stderr.strip())
+                # Fast-forward failed — likely a merge conflict
+                logger.warning("Heartbeat: pull from %s failed — %s", remote, result.stderr.strip())
+
+                # Log conflict for user review
+                from datetime import datetime
+                conflict_file = Path(project_dir) / "memory" / "merge-conflicts.md"
+                conflict_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(conflict_file, "a") as f:
+                    f.write(f"\n## {datetime.now().isoformat()}\n")
+                    f.write(f"Failed to pull from `{remote}` (fast-forward only).\n")
+                    f.write(f"```\n{result.stderr.strip()}\n```\n")
+                    f.write("**Action needed:** manually resolve in the instance directory.\n")
+
+                logger.warning("Heartbeat: conflict logged to memory/merge-conflicts.md")
         except Exception:
             logger.exception("Heartbeat: pull failed")
 
