@@ -45,12 +45,16 @@ source .env && python run.py
 git clone https://github.com/aflekkas/lobster-bot.git ~/lobster-bot
 cd ~/lobster-bot
 pip install -r requirements.txt
+npx playwright install --with-deps chromium
+```
+
+Create your `.env`, then set up the service:
+
+```bash
 cp deploy/systemd/lobster-bot.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now lobster-bot
 ```
-
-Create `/root/lobster-bot/.env` with your token and user ID. That's it.
 
 ## Requirements
 

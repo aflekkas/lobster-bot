@@ -42,6 +42,10 @@ fi
 echo "Installing Python dependencies..."
 $PYTHON -m pip install -r requirements.txt --quiet
 
+# Install Playwright browser for web browsing
+echo "Installing Playwright Chromium..."
+npx playwright install --with-deps chromium
+
 # Create .env if missing
 if [ ! -f "$REPO_DIR/.env" ]; then
     echo ""
