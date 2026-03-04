@@ -23,7 +23,7 @@ async def send_message(
         "claude",
         "-p", message,
         "--output-format", "json",
-        "--permission-mode", "bypassPermissions",
+        "--permission-mode", "allowedTools",
     ]
     if session_id:
         cmd.extend(["--resume", session_id])
