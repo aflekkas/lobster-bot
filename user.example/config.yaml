@@ -1,0 +1,8 @@
+telegram:
+  # Get a token from @BotFather on Telegram
+  token: "YOUR_BOT_TOKEN_HERE"
+
+  # Your Telegram user ID(s) — only these users can talk to the bot
+  # Find yours by messaging @userinfobot on Telegram
+  allowed_users:
+    - 123456789
