@@ -6,3 +6,15 @@ telegram:
   # Find yours by messaging @userinfobot on Telegram
   allowed_users:
     - 123456789
+
+# Optional: scheduled tasks that run automatically
+# scheduler:
+#   tasks:
+#     - name: morning_brief
+#       cron: "0 8 * * *"
+#       prompt: "Good morning! Give me a brief overview of today — any tasks, reminders, or news I should know about."
+#       chat_id: 123456789
+#     - name: evening_summary
+#       cron: "0 21 * * *"
+#       prompt: "Summarize what we discussed today and any outstanding tasks."
+#       chat_id: 123456789

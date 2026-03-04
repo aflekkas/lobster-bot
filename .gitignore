@@ -10,8 +10,12 @@ venv/
 
 # Project
 user/
-memory/
 *.db
+
+# Memory — ignore contents but keep structure
+memory/daily/*.md
+memory/chats/*.md
+!memory/facts.md
 
 # OS
 .DS_Store
