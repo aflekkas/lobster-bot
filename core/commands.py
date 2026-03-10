@@ -1,5 +1,6 @@
 """Telegram slash commands — handled directly, no Claude involved."""
 import logging
+import re
 import subprocess
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -7,6 +8,52 @@ from pathlib import Path
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 
 logger = logging.getLogger(__name__)
+
+RESERVED_COMMANDS = {
+    "new", "cancel", "history", "memory", "tools", "agents",
+    "logs", "status", "repo", "restart", "help", "start",
+}
+
+
+def _parse_command_file(content: str) -> tuple[str, str]:
+    fm_match = re.match(r"^---\n(.*?)\n---\n", content, re.DOTALL)
+    description, body = "no description", content
+    if fm_match:
+        for line in fm_match.group(1).splitlines():
+            if line.startswith("description:"):
+                description = line.split(":", 1)[1].strip().strip('"').strip("'")
+                break
+        body = content[fm_match.end():].strip()
+    return description, body
+
+
+def discover_custom_commands(project_dir: str) -> list[dict]:
+    commands_dir = Path(project_dir) / ".claude" / "commands"
+    if not commands_dir.exists():
+        return []
+    result = []
+    for f in sorted(commands_dir.glob("*.md")):
+        name = f.stem.lower()
+        if name in RESERVED_COMMANDS:
+            logger.warning("Custom command '%s' conflicts with reserved name, skipping", name)
+            continue
+        try:
+            description, body = _parse_command_file(f.read_text())
+            result.append({"name": name, "description": description, "body": body})
+        except Exception:
+            logger.warning("Failed to parse command file: %s", f)
+    return result
+
+
+async def cmd_custom_command(update, context, command_name: str, command_body: str, process_fn=None, **kw):
+    args = " ".join(context.args) if context.args else ""
+    parts = [f"[Command: /{command_name}]", "", command_body.strip()]
+    if args:
+        parts += ["", f"User input: {args}"]
+    if process_fn:
+        await process_fn(update, "\n".join(parts))
+    else:
+        await update.message.reply_text("command handler not wired up")
 
 
 def _btn(text, data):

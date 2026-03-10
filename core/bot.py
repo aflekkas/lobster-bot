@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +19,7 @@ from core.bridge import cancel_chat, send_message
 from core.commands import (
     cmd_agents,
     cmd_cancel,
+    cmd_custom_command,
     cmd_help,
     cmd_history,
     cmd_logs,
@@ -27,6 +29,7 @@ from core.commands import (
     cmd_restart,
     cmd_status,
     cmd_tools,
+    discover_custom_commands,
     handle_callback,
 )
 from core.config import load_config
@@ -64,7 +67,13 @@ def _auth_wrap(handler_fn, **extra_kw):
         if not is_authorized(update.effective_user.id, _config["telegram"]["allowed_users"]):
             await update.message.reply_text("You are not authorized to use this bot.")
             return
-        await handler_fn(update, context, project_dir=_project_dir, sessions=_sessions, **extra_kw)
+        await handler_fn(
+            update, context,
+            project_dir=_project_dir,
+            sessions=_sessions,
+            process_fn=lambda upd, txt: _process_and_respond(upd, txt),
+            **extra_kw,
+        )
     return wrapper
 
 
@@ -279,6 +288,10 @@ def main():
 
     (Path(_project_dir) / "memory" / "daily").mkdir(parents=True, exist_ok=True)
 
+    runtime_dir = Path(_project_dir) / "runtime"
+    if runtime_dir.exists():
+        shutil.rmtree(runtime_dir, ignore_errors=True)
+
     token = _config["telegram"]["token"]
     app = Application.builder().token(token).concurrent_updates(True).build()
 
@@ -286,7 +299,8 @@ def main():
 
     async def post_init(application):
         application.create_task(_heartbeat(_project_dir))
-        await application.bot.set_my_commands([
+
+        static_commands = [
             BotCommand("new", "New conversation"),
             BotCommand("cancel", "Cancel current request"),
             BotCommand("history", "Recent conversations"),
@@ -298,7 +312,19 @@ def main():
             BotCommand("repo", "Git repo info"),
             BotCommand("restart", "Restart the bot"),
             BotCommand("help", "Show commands"),
-        ])
+        ]
+
+        custom_cmds = discover_custom_commands(_project_dir)
+        for cmd in custom_cmds:
+            application.add_handler(CommandHandler(
+                cmd["name"],
+                _auth_wrap(cmd_custom_command, command_name=cmd["name"], command_body=cmd["body"]),
+            ))
+
+        await application.bot.set_my_commands(
+            static_commands + [BotCommand(c["name"], c["description"][:256]) for c in custom_cmds]
+        )
+
         for user_id in allowed:
             try:
                 await application.bot.send_message(user_id, "i'm back online 🦞")

@@ -11,5 +11,18 @@
       "Bash(*)"
     ],
     "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash|WebSearch|WebFetch|Edit|Write",
+        "hooks": [{ "type": "command", "command": "bash hooks/telegram-notify.sh" }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "bash hooks/session-end.sh" }]
+      }
+    ]
   }
 }

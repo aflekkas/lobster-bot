@@ -3,7 +3,10 @@ import json
 import logging
 import os
 import re
+import time
 from dataclasses import dataclass
+from datetime import date, datetime
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +60,10 @@ async def send_message(
     # Strip CLAUDECODE env var to allow nested subprocess invocation
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
+    runtime_file = None
+    if chat_id is not None:
+        runtime_file = _write_runtime_context(project_dir, chat_id)
+
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -74,6 +81,11 @@ async def send_message(
     finally:
         if chat_id is not None:
             _active_procs.pop(chat_id, None)
+        if runtime_file is not None:
+            try:
+                runtime_file.unlink(missing_ok=True)
+            except Exception:
+                pass
 
     # Process was cancelled
     if proc.returncode is not None and proc.returncode < 0:
@@ -95,9 +107,31 @@ async def send_message(
 
     result_text = _sanitize_unicode(data.get("result", ""))
 
+    _append_daily_log(project_dir, message, result_text)
+
     return ClaudeResponse(
         text=result_text,
         session_id=data.get("session_id"),
         cost_usd=data.get("cost_usd", 0.0),
         usage=data.get("usage"),
     )
+
+
+def _append_daily_log(project_dir: str, user_msg: str, assistant_msg: str) -> None:
+    try:
+        log_path = Path(project_dir) / "memory" / "daily" / f"{date.today()}.md"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        now = datetime.now().strftime("%H:%M")
+        entry = f"\n## {now}\n\n**user:** {user_msg[:1500]}\n\n**bot:** {assistant_msg[:2000]}\n"
+        with log_path.open("a") as f:
+            f.write(entry)
+    except Exception:
+        logger.exception("Failed to write daily log")
+
+
+def _write_runtime_context(project_dir: str, chat_id: int) -> Path:
+    runtime_dir = Path(project_dir) / "runtime"
+    runtime_dir.mkdir(exist_ok=True)
+    p = runtime_dir / f"{chat_id}.json"
+    p.write_text(json.dumps({"chat_id": chat_id, "started_at": time.time()}))
+    return p
