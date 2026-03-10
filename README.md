@@ -10,8 +10,11 @@ It searches the web, remembers your conversations, handles photos and documents,
 - **Photos & documents** — send images, PDFs, files — it can see and read them
 - **Persistent memory** — remembers facts about you and keeps daily logs
 - **Conversations that stick** — sessions persist, context carries across messages
-- **Usage tracking** — know what you're spending with `/usage`
+- **Live progress updates** — sends you updates while working on long tasks
+- **Message queuing** — send multiple messages while it's thinking, they all get processed
+- **Cost alerts** — warns you at 50%, 80%, 100% of your daily budget
 - **Auto-updates** — pulls from git every 5 minutes, push a change and it goes live
+- **Autosync** — automatically commits and pushes local changes (via cron)
 - **Startup notification** — messages you when it comes back online
 
 ## Full Setup Guide
@@ -105,12 +108,27 @@ systemctl enable --now lobster-bot
 
 You should get a "i'm back online 🦞" message on Telegram. Send it a message to test.
 
-### 9. You're Done
+### 9. Set Up Autosync (Optional)
+
+Autosync commits and pushes any local changes every 5 minutes — keeps your memory, config, and customizations backed up to git.
+
+```bash
+crontab -e
+```
+
+Add this line:
+
+```
+*/5 * * * * /root/lobster-bot/deploy/autosync.sh >> /root/lobster-bot/logs/autosync.log 2>&1
+```
+
+### 10. You're Done
 
 The bot:
 - Runs 24/7 as a systemd service
 - Restarts automatically if it crashes or the server reboots
 - Auto-pulls updates from git every 5 minutes
+- Logs everything to `logs/bot.log`
 
 ## Using the Bot
 
@@ -128,15 +146,24 @@ Just message it on Telegram like you'd text a friend. It's Claude — it can do 
 
 **Commands:**
 - `/new` — Start a fresh conversation (clears session context)
-- `/usage` — See how much you've spent today and total
+- `/cancel` — Stop a running request
+- `/history` — Browse recent conversations and resume past sessions
+- `/memory` — View saved facts and daily logs
+- `/tools` — Browse installed tools
+- `/agents` — List configured agents
+- `/logs` — View bot logs and filter errors
 - `/status` — Check current session ID
+- `/repo` — Git repo info (status, commits, branches)
+- `/restart` — Restart the bot service
 - `/help` — List commands
 
 **Tips:**
 - If the bot seems confused or stuck on old context, send `/new` to reset
+- Send `/cancel` if a request is taking too long or you changed your mind
 - Long responses get split into chunks automatically (Telegram limit)
 - The bot remembers you across conversations via `memory/facts.md`
 - It keeps a daily log at `memory/daily/` — you can ask "what did we talk about yesterday?"
+- If you send messages while it's busy, they queue up and get processed next
 
 ## Debugging
 
@@ -151,10 +178,12 @@ You want to see `active (running)`. If it says `failed`, check the logs.
 ### View logs
 
 ```bash
+# Live stream
 journalctl -u lobster-bot -f
-```
 
-This streams live logs. `Ctrl+C` to stop watching.
+# Or read the log file directly
+tail -100 ~/lobster-bot/logs/bot.log
+```
 
 ### View recent logs
 
@@ -239,13 +268,17 @@ Or ask the bot to do it via Telegram — it has permission.
 Telegram → python-telegram-bot → claude -p --output-format json → Telegram
 ```
 
-- `core/bot.py` — Telegram handlers, media download, heartbeat
-- `core/bridge.py` — Claude Code subprocess wrapper (`claude -p`)
-- `core/session.py` — SQLite session + usage tracking
+- `core/bot.py` — Telegram handlers, typing indicator, message queuing, cost alerts
+- `core/bridge.py` — Claude Code subprocess wrapper with cancel support
+- `core/commands.py` — Slash commands with inline keyboard UI
+- `core/session.py` — SQLite session, usage, and chat log tracking
 - `core/config.py` — Loads env vars
+- `run.py` — Entry point with rotating log file setup
 - `.claude/settings.json` — Tool permissions (allow/deny)
 - `CLAUDE.md` — Bot personality and behavior instructions
-- `memory/` — Facts, daily logs, chat summaries (written by the bot)
+- `tools/telegram/send.sh` — Send live updates to Telegram from Claude
+- `deploy/autosync.sh` — Cron-based git commit + push
+- `memory/` — Facts, daily logs (written by the bot)
 - `media/{chat_id}/` — Downloaded photos, docs, voice messages
 
 ## Customization
@@ -257,6 +290,10 @@ Edit `CLAUDE.md` — this is the system prompt Claude sees every conversation.
 ### Change what the bot can do
 
 Edit `.claude/settings.json` — add or remove tools from the allow/deny lists.
+
+### Change the daily cost budget
+
+Edit `DAILY_BUDGET` in `core/bot.py` (default: $5.00/day).
 
 ### Add more users
 

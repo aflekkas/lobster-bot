@@ -32,6 +32,15 @@ class SessionManager:
                 input_tokens INTEGER NOT NULL DEFAULT 0,
                 output_tokens INTEGER NOT NULL DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS chat_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                timestamp REAL NOT NULL,
+                role TEXT NOT NULL,
+                text TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_log_chat_id ON chat_log(chat_id);
+            CREATE INDEX IF NOT EXISTS idx_chat_log_timestamp ON chat_log(timestamp);
         """)
 
     def get_session(self, chat_id: int) -> str | None:
@@ -103,7 +112,6 @@ class SessionManager:
         params_today = (today_start, chat_id) if chat_id else (today_start,)
         params_all = (chat_id,) if chat_id else ()
 
-        # Today's usage
         today = self._db.execute(
             f"""SELECT COALESCE(SUM(cost_usd), 0) as cost,
                        COALESCE(SUM(input_tokens), 0) as input_tok,
@@ -113,7 +121,6 @@ class SessionManager:
             params_today if not chat_id else (chat_id, today_start),
         ).fetchone()
 
-        # All-time usage
         total = self._db.execute(
             f"""SELECT COALESCE(SUM(cost_usd), 0) as cost,
                        COALESCE(SUM(input_tokens), 0) as input_tok,
@@ -137,3 +144,18 @@ class SessionManager:
                 "messages": total["messages"],
             },
         }
+
+    def log_chat(self, chat_id: int, role: str, text: str):
+        """Record a user or assistant message to the chat log."""
+        self._db.execute(
+            "INSERT INTO chat_log (chat_id, timestamp, role, text) VALUES (?, ?, ?, ?)",
+            (chat_id, time.time(), role, text),
+        )
+        self._db.commit()
+
+    def get_chat_history(self, chat_id: int, limit: int = 50) -> list[dict]:
+        rows = self._db.execute(
+            "SELECT * FROM chat_log WHERE chat_id = ? ORDER BY timestamp DESC LIMIT ?",
+            (chat_id, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]

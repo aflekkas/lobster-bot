@@ -5,6 +5,8 @@ import os
 import shutil
 import subprocess
 import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 
 def bootstrap():
@@ -49,10 +51,24 @@ def bootstrap():
 if __name__ == "__main__":
     bootstrap()
 
+    # Create logs directory
+    log_dir = Path(__file__).parent / "logs"
+    log_dir.mkdir(exist_ok=True)
+
+    # Rotating file handler (5MB per file, 3 backups)
+    file_handler = RotatingFileHandler(
+        log_dir / "bot.log", maxBytes=5_000_000, backupCount=3,
+    )
+    file_handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        handlers=[logging.StreamHandler(), file_handler],
     )
+
+    # Silence noisy HTTP logging
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     from core.bot import main
     main()

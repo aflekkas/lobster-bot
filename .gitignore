@@ -16,10 +16,14 @@ venv/
 *.lock
 .claude_lock
 media/
+logs/
 
 # Memory — keep structure, ignore runtime content
 memory/daily/*.md
-memory/chats/*.md
+memory/secrets/
+
+# Node
+node_modules/
 
 # Temp files
 /tmp/
