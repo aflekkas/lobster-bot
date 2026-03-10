@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 RESERVED_COMMANDS = {
     "new", "cancel", "history", "memory", "tools", "agents",
-    "logs", "status", "repo", "restart", "help", "start",
+    "logs", "status", "repo", "restart", "help", "start", "schedule",
 }
 
 
@@ -379,6 +379,14 @@ async def cmd_restart(update, context, **kw):
     subprocess.Popen(["systemctl", "restart", "lobster-bot"])
 
 
+# -- /schedule ----------------------------------------------------------------
+
+async def cmd_schedule(update, context, project_dir, **kw):
+    from core.scheduler import list_schedules
+    text = list_schedules(project_dir)
+    await update.message.reply_text(text)
+
+
 # -- /help --------------------------------------------------------------------
 
 async def cmd_help(update, context, **kw):
@@ -392,6 +400,7 @@ async def cmd_help(update, context, **kw):
         "/logs — View logs\n"
         "/status — Session info\n"
         "/repo — Git repo info\n"
+        "/schedule — View scheduled tasks\n"
         "/restart — Restart the bot\n"
         "/help — This message"
     )

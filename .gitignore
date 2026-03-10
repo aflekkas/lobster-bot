@@ -17,6 +17,7 @@ venv/
 .claude_lock
 media/
 logs/
+user/.schedule_state.json
 
 # Memory — keep structure, ignore runtime content
 memory/daily/*.md

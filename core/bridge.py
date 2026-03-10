@@ -64,6 +64,10 @@ async def send_message(
     if chat_id is not None:
         runtime_file = _write_runtime_context(project_dir, chat_id)
 
+    # Acquire file lock to prevent concurrent Claude invocations (scheduler uses this too)
+    from core.scheduler import acquire_lock, release_lock
+    lock_fd = acquire_lock()
+
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -86,6 +90,8 @@ async def send_message(
                 runtime_file.unlink(missing_ok=True)
             except Exception:
                 pass
+        if lock_fd is not None:
+            release_lock(lock_fd)
 
     # Process was cancelled
     if proc.returncode is not None and proc.returncode < 0:

@@ -27,12 +27,14 @@ from core.commands import (
     cmd_new,
     cmd_repo,
     cmd_restart,
+    cmd_schedule,
     cmd_status,
     cmd_tools,
     discover_custom_commands,
     handle_callback,
 )
 from core.config import load_config
+from core.scheduler import scheduler_loop
 from core.session import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -299,6 +301,7 @@ def main():
 
     async def post_init(application):
         application.create_task(_heartbeat(_project_dir))
+        application.create_task(scheduler_loop(_project_dir, application.bot))
 
         static_commands = [
             BotCommand("new", "New conversation"),
@@ -310,6 +313,7 @@ def main():
             BotCommand("logs", "View logs"),
             BotCommand("status", "Session info"),
             BotCommand("repo", "Git repo info"),
+            BotCommand("schedule", "View scheduled tasks"),
             BotCommand("restart", "Restart the bot"),
             BotCommand("help", "Show commands"),
         ]
@@ -342,6 +346,7 @@ def main():
     app.add_handler(CommandHandler("logs", _auth_wrap(cmd_logs)))
     app.add_handler(CommandHandler("status", _auth_wrap(cmd_status)))
     app.add_handler(CommandHandler("repo", _auth_wrap(cmd_repo)))
+    app.add_handler(CommandHandler("schedule", _auth_wrap(cmd_schedule)))
     app.add_handler(CommandHandler("restart", _auth_wrap(cmd_restart)))
     app.add_handler(CommandHandler("help", _auth_wrap(cmd_help)))
     app.add_handler(CommandHandler("start", _auth_wrap(cmd_help)))
